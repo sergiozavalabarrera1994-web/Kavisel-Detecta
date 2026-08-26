@@ -1,0 +1,186 @@
+name: Compilar Kavisel Detecta
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  # 📱 ANDROID — APK listo para instalar
+  android:
+    name: 📱 Compilar Android
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Obtener código
+        uses: actions/checkout@v4
+      
+      - name: 🎨 GENERAR ÍCONO — Círculo negro, borde rojo neón, ondas RF, KD
+        run: |
+          python3 -c "
+          from PIL import Image, ImageDraw, ImageFont
+          import os
+          size = 512
+          img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+          draw = ImageDraw.Draw(img)
+          # Círculo negro con borde rojo neón
+          draw.ellipse([20, 20, size-20, size-20], fill=(10, 10, 18, 255), outline=(255, 30, 50, 255), width=8)
+          # Ondas de radiofrecuencia
+          for i, r in enumerate([80, 130, 180]):
+            draw.arc([size//2 - r, size//2 - r, size//2 + r, size//2 + r], 0, 180, fill=(255, 40, 60, 200), width=6-i*1)
+          # Cruz de emergencia
+          draw.rectangle([200, 60, 240, 140], fill=(255, 40, 60, 255))
+          draw.rectangle([180, 80, 260, 120], fill=(255, 40, 60, 255))
+          # Iniciales KD
+          try:
+            font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 160)
+          except:
+            font = ImageFont.load_default()
+          draw.text((155, 280), 'KD', fill=(255,255,255,255), font=font)
+          img.save('icon.png')
+          print('✅ Ícono GENERADO — Círculo negro + Rojo neón + Ondas RF + KD')
+          "
+      
+      - name: 🛠️ Configurar Python
+        uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      
+      - name: 📦 Instalar dependencias
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y git zip openjdk-17-jdk build-essential libffi-dev libssl-dev
+          pip install --upgrade pip
+          pip install buildozer cython==0.29.37 pillow
+      
+      - name: 🔨 Compilar APK
+        run: buildozer android debug
+      
+      - name: 📤 Subir APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kavisel-Detecta-Android-APK
+          path: bin/*.apk
+          retention-days: 30
+
+  # 🍎 iOS — Proyecto listo para Xcode
+  ios:
+    name: 🍎 Preparar iOS
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Obtener código
+        uses: actions/checkout@v4
+      
+      - name: 🎨 Generar ícono para iOS
+        run: |
+          python3 -c "
+          from PIL import Image, ImageDraw, ImageFont
+          size = 1024
+          img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+          draw = ImageDraw.Draw(img)
+          draw.ellipse([40, 40, size-40, size-40], fill=(10, 10, 18, 255), outline=(255, 30, 50, 255), width=16)
+          for i, r in enumerate([160, 260, 360]):
+            draw.arc([size//2 - r, size//2 - r, size//2 + r, size//2 + r], 0, 180, fill=(255, 40, 60, 200), width=12-i*2)
+          draw.rectangle([400, 120, 480, 280], fill=(255, 40, 60, 255))
+          draw.rectangle([360, 160, 520, 240], fill=(255, 40, 60, 255))
+          try:
+            font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 320)
+          except:
+            font = ImageFont.load_default()
+          draw.text((310, 560), 'KD', fill=(255,255,255,255), font=font)
+          img.save('icon_ios.png')
+          print('✅ Ícono iOS generado')
+          "
+      
+      - name: 📁 Crear estructura de proyecto iOS
+        run: |
+          mkdir -p ios/KaviselDetecta
+          cat > ios/KaviselDetecta/Info.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleName</key><string>Kavisel Detecta</string>
+              <key>CFBundleDisplayName</key><string>Kavisel Detecta</string>
+              <key>CFBundleIdentifier</key><string>org.kavisel.detecta</string>
+              <key>CFBundleVersion</key><string>1.4</string>
+              <key>CFBundlePackageType</key><string>APPL</string>
+              <key>LSMinimumSystemVersion</key><string>15.0</string>
+              <key>NSLocationWhenInUseUsageDescription</key>
+              <string>Se necesita ubicación para detección de señales</string>
+              <key>NSCameraUsageDescription</key>
+              <string>Acceso para funciones de seguridad</string>
+          </dict>
+          </plist>
+          EOF
+          echo "✅ Proyecto iOS creado"
+      
+      - name: 📤 Subir proyecto iOS
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kavisel-Detecta-iOS-Proyecto
+          path: ios/
+          retention-days: 30
+
+  # 🌐 VERSIÓN WEB
+  web:
+    name: 🌐 Compilar Web
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Obtener código
+        uses: actions/checkout@v4
+      
+      - name: 🎨 Generar ícono web
+        run: |
+          python3 -c "
+          from PIL import Image, ImageDraw, ImageFont
+          size = 512
+          img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
+          draw = ImageDraw.Draw(img)
+          draw.ellipse([20, 20, size-20, size-20], fill=(10, 10, 18, 255), outline=(255, 30, 50, 255), width=8)
+          for i, r in enumerate([80, 130, 180]):
+            draw.arc([size//2 - r, size//2 - r, size//2 + r, size//2 + r], 0, 180, fill=(255, 40, 60, 200), width=6-i*1)
+          draw.rectangle([200, 60, 240, 140], fill=(255, 40, 60, 255))
+          draw.rectangle([180, 80, 260, 120], fill=(255, 40, 60, 255))
+          try:
+            font = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 160)
+          except:
+            font = ImageFont.load_default()
+          draw.text((155, 280), 'KD', fill=(255,255,255,255), font=font)
+          img.save('favicon.png')
+          print('✅ Ícono Web generado')
+          "
+      
+      - name: 📦 Preparar paquete web
+        run: |
+          mkdir -p web
+          cp main.py web/
+          cp favicon.png web/
+          cat > web/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="es">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Kavisel Detecta — Alerta Máxima</title>
+              <link rel="icon" href="favicon.png">
+              <style>
+                  body { background: #0a0a12; color: white; font-family: sans-serif; padding: 20px; }
+                  h1 { color: #ff1a33; text-align: center; }
+                  .alerta-max { color: #ff0000; font-weight: bold; }
+              </style>
+          </head>
+          <body>
+              <h1>📡 KAVISEL DETECTA</h1>
+              <p class="alerta-max">⚠️ ALERTA MÁXIMA ACTIVA — Drones · PDI · Carabineros</p>
+              <p>Versión 1.4 — Creador: Pista — Sergio David Zavala V.</p>
+              <p>Protección personal en tiempo real.</p>
+          </body>
+          </html>
+          EOF
+          echo "✅ Versión Web lista"
+      
+      - name: 📤 Subir paquete Web
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kavisel-Detecta-Web
+          path: web/
+          retention-days: 30
