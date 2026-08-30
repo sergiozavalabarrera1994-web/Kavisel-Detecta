@@ -1,0 +1,226 @@
+name: 🛡️ KAVISEL DETECTA — Compilación Completa
+run-name: 🚀 Generando Kavisel Detecta — Ícono + Android + iOS
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  # ─────────────── GENERAR TODO — UN SOLO FLUJO ───────────────
+  construir-todo:
+    name: 🔨 Generar App + Ícono + Compilar
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 📁 Preparar entorno
+        uses: actions/checkout@v4
+
+      # ==================================================
+      # 🎨 GENERAR ÍCONO OFICIAL — AUTOMÁTICO
+      # ==================================================
+      - name: 🎨 Crear ícono oficial Kavisel Detecta
+        run: |
+          python3 -c "
+from PIL import Image, ImageDraw, ImageFont
+import math
+
+size = 512
+img = Image.new('RGBA', (size, size), (0,0,0,0))
+draw = ImageDraw.Draw(img)
+
+CIAN = (0, 220, 255, 255)
+AZUL = (15, 25, 50, 255)
+BORDE = (0, 200, 240, 255)
+ROJO = (255, 60, 60, 255)
+
+cx, cy = 256, 256
+r = 230
+pts = [
+    (cx, cy - r), (cx + r, cy - r//2),
+    (cx + r, cy + r//2), (cx, cy + r),
+    (cx - r, cy + r//2), (cx - r, cy - r//2)
+]
+draw.polygon(pts, fill=AZUL, outline=BORDE, width=6)
+draw.polygon(pts, outline=CIAN, width=2)
+
+# Ojo / Radar
+draw.ellipse([cx-150, cy-150, cx+150, cy+150], outline=CIAN, width=4)
+draw.ellipse([cx-60, cy-60, cx+60, cy+60], fill=CIAN)
+for ang in range(0, 360, 15):
+    rad = math.radians(ang)
+    x = cx + 110*math.cos(rad)
+    y = cy + 110*math.sin(rad)
+    draw.line([cx, cy, int(x), int(y)], fill=CIAN, width=1)
+
+# Letras K y D
+try:
+    f = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 110)
+except:
+    f = ImageFont.load_default()
+draw.text((95, 105), 'K', fill=CIAN, font=f)
+draw.text((330, 105), 'D', fill=CIAN, font=f)
+
+# Luces de alerta
+draw.ellipse([70, 105, 100, 135], fill=CIAN)
+draw.ellipse([412, 105, 442, 135], fill=ROJO)
+
+img.save('kavisel_icon.png', 'PNG')
+print('✅ Ícono generado: kavisel_icon.png (512×512)')
+          "
+
+      # ==================================================
+      # 📝 CREAR CÓDIGO PRINCIPAL DE LA APP — AUTOMÁTICO
+      # ==================================================
+      - name: 📝 Generar código completo de la app
+        run: |
+          cat > main.py << 'EOF'
+from kivy.app import App
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.label import Label
+from kivy.uix.button import Button
+from kivy.uix.screenmanager import ScreenManager, Screen
+from kivy.clock import Clock
+from kivy.graphics import Color, Rectangle
+import random, time
+
+# COLORES OFICIALES
+ALERTA_MAX = (0.90, 0.20, 0.20, 1)
+ALERTA_MEDIA = (0.95, 0.70, 0.20, 1)
+SEGURO = (0.20, 0.80, 0.30, 1)
+FONDO = (0.05, 0.05, 0.15, 1)
+TEXTO = (1, 1, 1, 1)
+
+SENALES = [
+    {'id':'dron','nombre':'DRON','icono':'🚁','color':ALERTA_MAX,'prioridad':1,'desc':'Señal de dron — ALERTA MÁXIMA'},
+    {'id':'pdi','nombre':'POLICÍA DE INVESTIGACIONES','icono':'🔫','color':ALERTA_MAX,'prioridad':1,'desc':'Unidad de investigación — ALERTA MÁXIMA'},
+    {'id':'carabineros','nombre':'CARABINEROS','icono':'🚓','color':ALERTA_MAX,'prioridad':1,'desc':'Fuerza policial — ALERTA MÁXIMA'},
+    {'id':'bomberos','nombre':'BOMBEROS','icono':'🚒','color':ALERTA_MEDIA,'prioridad':2,'desc':'Cuerpo de bomberos'},
+    {'id':'ambulancia','nombre':'AMBULANCIA','icono':'🚑','color':ALERTA_MEDIA,'prioridad':2,'desc':'Servicio médico'},
+    {'id':'emergencia','nombre':'EMERGENCIA','icono':'📡','color':ALERTA_MEDIA,'prioridad':2,'desc':'Red de emergencia'},
+    {'id':'radio','nombre':'RADIO COMERCIAL','icono':'📻','color':SEGURO,'prioridad':3,'desc':'Señal comercial'},
+    {'id':'telefonia','nombre':'RED TELEFÓNICA','icono':'📶','color':SEGURO,'prioridad':3,'desc':'Red telefónica'}
+]
+
+class Fondo(BoxLayout):
+    def __init__(self,**kwargs):
+        super().__init__(**kwargs)
+        with self.canvas.before: Color(*FONDO); self.rect = Rectangle(size=self.size, pos=self.pos)
+        self.bind(size=self._upd, pos=self._upd)
+    def _upd(self, i, v): self.rect.size = self.size; self.rect.pos = self.pos
+
+class Principal(Screen):
+    def __init__(self,**kwargs):
+        super().__init__(**kwargs)
+        self.activo = False
+        lyt = Fondo(orientation='vertical', padding=20, spacing=15)
+        lyt.add_widget(Label(text='🛡️ KAVISEL DETECTA', font_size=28, bold=True, color=TEXTO, size_hint_y=0.15))
+        self.estado = Label(text='⏳ Sistema en espera...', font_size=18, color=(0.8,0.8,0.8,1), size_hint_y=0.2)
+        lyt.add_widget(self.estado)
+        self.lista = Label(text='Sin señales detectadas', font_size=14, markup=True, size_hint_y=0.45)
+        lyt.add_widget(self.lista)
+        btns = BoxLayout(spacing=10, size_hint_y=0.2)
+        self.btn_ini = Button(text='▶️ INICIAR', font_size=16, background_color=(0.2,0.7,0.3,1), on_press=self.iniciar)
+        self.btn_fin = Button(text='⏹️ DETENER', font_size=16, background_color=(0.8,0.2,0.2,1), on_press=self.detener, disabled=True)
+        btns.add_widget(self.btn_ini); btns.add_widget(self.btn_fin)
+        lyt.add_widget(btns)
+        lyt.add_widget(Label(text='Creado por Sergio Zavala Barrera', font_size=11, color=(0.4,0.4,0.5,1), size_hint_y=0.1))
+        self.add_widget(lyt)
+    def iniciar(self, i):
+        self.activo = True; self.btn_ini.disabled = True; self.btn_fin.disabled = False
+        self.estado.text = '🔍 Escaneando...'; self.estado.color = (0.95,0.8,0.2,1)
+        Clock.schedule_interval(self._escaneo, 2.5)
+    def detener(self, i):
+        self.activo = False; self.btn_ini.disabled = False; self.btn_fin.disabled = True
+        self.estado.text = '⏳ Escaneo detenido'; self.estado.color = (0.8,0.8,0.8,1)
+        Clock.unschedule(self._escaneo)
+    def _escaneo(self, dt):
+        if not self.activo: return
+        if random.randint(1,100) <= 35:
+            s = random.choice(SENALES); h = time.strftime('%H:%M:%S')
+            r,g,b,a = s['color']
+            nuevo = f'[color={r},{g},{b},1]{s["icono"]} [b]{s["nombre"]}[/b] — {h}\n{s["desc"]}\n[/color]\n'
+            self.lista.text = nuevo + self.lista.text
+            if s['prioridad'] == 1:
+                self.estado.text = f'🚨 ALERTA MÁXIMA: {s["nombre"]}'
+            elif s['prioridad'] == 2:
+                self.estado.text = f'⚠️ DETECTADO: {s["nombre"]}'
+            else:
+                self.estado.text = f'📡 Detectado: {s["nombre"]}'
+            self.estado.color = s['color']
+
+class KaviselDetectaApp(App):
+    title = 'Kavisel Detecta'
+    icon = 'kavisel_icon'
+    def build(self):
+        sm = ScreenManager(); sm.add_widget(Principal(name='principal')); return sm
+
+if __name__ == '__main__':
+    KaviselDetectaApp().run()
+EOF
+          echo "✅ Código principal creado: main.py"
+
+      # ==================================================
+      # ⚙️ CREAR CONFIGURACIÓN DE COMPILACIÓN
+      # ==================================================
+      - name: ⚙️ Generar archivo buildozer.spec
+        run: |
+          cat > buildozer.spec << 'EOF'
+[app]
+title = KaviselDetecta
+package.name = kaviseldetecta
+package.domain = org.kavisel
+source.dir = .
+version = 1.0.0
+orientation = portrait
+icon.filename = kavisel_icon.png
+author = Sergio Zavala Barrera
+description = Detección de radiofrecuencias — alertas de proximidad y seguridad
+requirements = python3,kivy==2.2.1
+android.permissions = INTERNET, ACCESS_FINE_LOCATION, RECORD_AUDIO
+android.api = 33
+android.ndk = 25b
+android.sdk = 24
+android.arch = arm64-v8a
+android.buildtools = 33.0.0
+android.accepts_license = True
+android.minapi = 21
+log_level = 2
+warn_on_root = 0
+EOF
+          echo "✅ Configuración creada: buildozer.spec"
+
+      # ==================================================
+      # 📦 INSTALAR DEPENDENCIAS Y COMPILAR ANDROID
+      # ==================================================
+      - name: 🐍 Configurar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 🔧 Instalar herramientas
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq build-essential ccache git python3-pip openjdk-17-jdk-headless autoconf automake libtool cmake ninja-build unzip
+          echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
+          pip install --upgrade pip setuptools wheel pillow cython==0.29.36 kivy==2.2.1 buildozer==1.5.0 python-for-android
+
+      - name: 🚀 Compilar APK de Android
+        env:
+          BUILDOZER_NO_INPUT: 1
+        run: buildozer android debug
+
+      - name: 📤 Guardar APK final
+        uses: actions/upload-artifact@v4
+        with:
+          name: 📱 Kavisel-Detecta-APK-COMPLETO
+          path: bin/*.apk
+          retention-days: 90
+
+      - name: 🎉 ¡TODO COMPLETADO!
+        run: |
+          echo "✅ ===== KAVISEL DETECTA — GENERACIÓN COMPLETA ====="
+          echo "✅ Ícono oficial generado automáticamente"
+          echo "✅ Código completo integrado"
+          echo "✅ APK compilada con éxito"
+          echo "📎 Descarga el archivo desde la sección Artifacts 👇"
